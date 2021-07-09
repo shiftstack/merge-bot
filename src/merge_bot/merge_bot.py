@@ -57,54 +57,63 @@ def configure_commit_info(repo, bot_name, bot_email):
         config.set_value("user", "name", bot_name)
 
 
+def git_is_ancestor(gitwd, a, b):
+    try:
+        gitwd.git.merge_base(a, b, is_ancestor=True)
+        return True
+    except git.exc.GitCommandError:
+        # merge_base --is-ancestor indicates true/false by raising an
+        # exception or not
+        return False
+
+
 def git_merge(gitwd, dest, source, merge):
     orig_commit = gitwd.active_branch.commit
 
-    if merge.branch in gitwd.remotes.merge.refs:
-        # Check if we have already pushed a merge to the merge branch which
-        # contains the current head of the source branch
+    def do_merge():
+        if merge.branch in gitwd.remotes.merge.refs:
+            # Check if we have already pushed a merge to the merge branch which
+            # contains the current head of the source branch
+            if git_is_ancestor(
+                gitwd, f"source/{source.branch}", f"merge/{merge.branch}"
+            ):
+                logging.info("Existing merge branch already contains source")
+
+                # We're not going to update merge branch
+                gitwd.head.reference = gitwd.remotes.merge.refs[merge.branch]
+                gitwd.head.reset(index=True, working_tree=True)
+                return
+            else:
+                logging.info("Existing merge branch needs to be updated")
+
+        logging.info("Performing merge")
         try:
-            gitwd.git.merge_base(
-                f"source/{source.branch}", f"merge/{merge.branch}", is_ancestor=True
+            gitwd.git.merge(f"source/{source.branch}", "--no-commit")
+        except git.exc.GitCommandError as ex:
+            raise RepoException(f"Git merge failed: {ex}")
+
+        if gitwd.is_dirty():
+            if check_conflict(gitwd):
+                raise RepoException("Merge conflict, needs manual resolution!")
+
+            logging.info("Committing merge")
+            gitwd.index.commit(
+                f"Merge {source.url}:{source.branch} into {dest.branch}",
+                parent_commits=(
+                    orig_commit,
+                    gitwd.remotes.source.refs[source.branch].commit,
+                ),
             )
-            logging.info("Existing merge branch already contains source")
 
-            # We're not going to update merge branch, but we still want to
-            # ensure there's a PR open on it.
-            gitwd.head.reference = gitwd.remotes.merge.refs[merge.branch]
-            gitwd.head.reset(index=True, working_tree=True)
-            return True
-        except git.exc.GitCommandError:
-            # merge_base --is-ancestor indicates true/false by raising an
-            # exception or not
-            logging.info("Existing merge branch needs to be updated")
+    do_merge()
 
-    logging.info("Performing merge")
-    try:
-        gitwd.git.merge(f"source/{source.branch}", "--no-commit")
-    except git.exc.GitCommandError as ex:
-        raise RepoException(f"Git merge failed: {ex}")
+    # Check if we've already merged
+    if git_is_ancestor(gitwd, f"merge/{merge.branch}", f"dest/{dest.branch}"):
+        logging.info("Destination is already up-to-date")
+        return False
 
-    if gitwd.is_dirty():
-        if check_conflict(gitwd):
-            raise RepoException("Merge conflict, needs manual resolution!")
-
-        logging.info("Committing merge")
-        gitwd.index.commit(
-            f"Merge {source.url}:{source.branch} into {dest.branch}",
-            parent_commits=(
-                orig_commit,
-                gitwd.remotes.source.refs[source.branch].commit,
-            ),
-        )
-        return True
-
-    if gitwd.active_branch.commit != orig_commit:
-        logging.info("Destination can be fast-forwarded")
-        return True
-
-    logging.info("No merge is necessary")
-    return False
+    logging.info("Destination needs to be updated")
+    return True
 
 
 def message_slack(webhook_url, msg):
