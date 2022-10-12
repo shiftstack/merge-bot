@@ -14,14 +14,10 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
-from collections import namedtuple
 import logging
 import os
-import shutil
 import subprocess
 import sys
-import traceback
-from urllib import parse as urlparse
 
 import git
 import github3
@@ -84,6 +80,15 @@ def git_merge(gitwd, dest, source, merge):
                 f"source/{source.branch}", f"merge/{merge.branch}", is_ancestor=True
             )
             logging.info("Existing merge branch already contains source")
+
+            # Let's double-check if it's not merged already to the dest. If so
+            # we don't need to update the PR.
+            dest_commit = gitwd.remotes.dest.refs[dest.branch].commit
+            merge_commit = gitwd.remotes.merge.refs[merge.branch].commit
+            if len(dest_commit.parents) > 1:  # Only check if it's merge commit
+                for parent in dest_commit.parents:
+                    if parent == merge_commit:  # We're up to date.
+                        return False
 
             # We're not going to update merge branch, but we still want to
             # ensure there's a PR open on it.
