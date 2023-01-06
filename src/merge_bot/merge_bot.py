@@ -298,7 +298,7 @@ def init_working_dir(
         logging.info("Fetching existing merge branch")
         gitwd.remotes.merge.fetch(merge_branch)
 
-    head_commit = gitwd.remotes.dest.refs.master.commit
+    head_commit = gitwd.remotes.dest.refs[dest_branch].commit
     if "merge" in gitwd.heads:
         gitwd.heads.merge.set_commit(head_commit)
     else:
