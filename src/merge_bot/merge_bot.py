@@ -56,7 +56,7 @@ def check_conflict(repo):
     unmerged_blobs = repo.index.unmerged_blobs()
 
     for v in unmerged_blobs.values():
-        for (stage, blob) in v:
+        for stage, blob in v:
             if stage != 0:
                 return True
 
