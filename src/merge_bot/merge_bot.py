@@ -22,6 +22,7 @@ import sys
 import git
 import github3
 import github3.exceptions as gh_exceptions
+import re
 import requests
 
 
@@ -134,10 +135,27 @@ def message_slack(webhook_url, msg):
     requests.post(webhook_url, json={"text": msg})
 
 
+def grab_go_version_from_go_mod():
+    try:
+        with open("go.mod", "r") as f:
+            txt = f.read()
+            match = re.search(r"go\s+(\d+.\d+)", txt)
+            if match:
+                return match.group(1)
+    except:
+        logging.info("Failed to discover go version from go.mod")
+    return ""
+
+
 def commit_go_mod_updates(repo):
     try:
+        go_version = grab_go_version_from_go_mod()
+        if len(go_version) > 0:
+            compat = f"-compat={go_version}"
+        else:
+            compat = ""
         proc = subprocess.run(
-            "go mod tidy", shell=True, check=True, capture_output=True
+            f"go mod tidy {compat}", shell=True, check=True, capture_output=True
         )
         logging.debug(f"go mod tidy output: {proc.stdout.decode()}")
         proc = subprocess.run(
