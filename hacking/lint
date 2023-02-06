@@ -1,6 +1,6 @@
 #!/bin/sh
 
-lint_args="--check"
+lint_args="--check --diff"
 
 usage() {
     echo "Usage: $0 [-r | --reformat]"
