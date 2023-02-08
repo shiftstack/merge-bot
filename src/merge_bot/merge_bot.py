@@ -132,7 +132,8 @@ def git_merge(gitwd, dest, source, merge):
 def message_slack(webhook_url, msg):
     if webhook_url is None:
         return
-    requests.post(webhook_url, json={"text": msg})
+    # Cut long messages to 500 chars
+    requests.post(webhook_url, json={"text": msg[:500]})
 
 
 def grab_go_version_from_go_mod():
