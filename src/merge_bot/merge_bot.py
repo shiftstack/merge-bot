@@ -133,7 +133,17 @@ def message_slack(webhook_url, msg):
     if webhook_url is None:
         return
     # Cut long messages to 500 chars
-    requests.post(webhook_url, json={"text": msg[:500]})
+    requests.post(
+        webhook_url,
+        json={
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "plain_text", "text": msg[:500], "emoji": False},
+                }
+            ]
+        },
+    )
 
 
 def grab_go_version_from_go_mod():
