@@ -139,7 +139,7 @@ def message_slack(webhook_url, msg):
             "blocks": [
                 {
                     "type": "section",
-                    "text": {"type": "plain_text", "text": msg[:500], "emoji": False},
+                    "text": {"type": "mrkdwn", "text": msg[:500]},
                 }
             ]
         },
