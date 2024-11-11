@@ -53,6 +53,14 @@ class RepoException(Exception):
     pass
 
 
+class MakeException(Exception):
+    """An non-fatal error when running make merge-bot, the PR will be sent but
+    the user should be informed that the make failed, has to manually run
+    the command and fix the issue."""
+
+    pass
+
+
 def check_conflict(repo):
     unmerged_blobs = repo.index.unmerged_blobs()
 
@@ -158,6 +166,41 @@ def grab_go_version_from_go_mod():
     return ""
 
 
+# Run `make merge-bot` to allow projects to run custom logic when merging
+# upstream changes. This is useful for projects that need to update vendored
+# dependencies or run other tasks after an upstream merge.
+# This is a best effort, and if the target doesn't exist, we ignore the error.
+def commit_run_make(repo):
+    try:
+        proc = subprocess.run(
+            "make merge-bot", shell=True, check=True, capture_output=True
+        )
+        logging.debug(f"make merge-bot output: {proc.stdout.decode()}")
+    except subprocess.CalledProcessError as err:
+        if "No rule to make target" not in err.stderr.decode():
+            raise MakeException(
+                f"Error running `make merge-bot`. Manual intervention is needed: {err}: {err.stderr.decode()}"
+            )
+        else:
+            logging.info("No make target for merge-bot, skipping")
+
+    if repo.is_dirty():
+        commit(repo, "CARRY: running make merge-bot")
+
+    return
+
+
+def commit(repo, msg):
+    try:
+        repo.git.add(all=True)
+        repo.git.commit("-m", msg)
+    except Exception as err:
+        err.extra_info = "Unable to commit changes in git"
+        raise err
+
+    return
+
+
 def commit_go_mod_updates(repo):
     try:
         go_version = grab_go_version_from_go_mod()
@@ -179,14 +222,7 @@ def commit_go_mod_updates(repo):
         )
 
     if repo.is_dirty():
-        try:
-            repo.git.add(all=True)
-            repo.git.commit(
-                "-m", "Updating and vendoring go modules after an upstream merge"
-            )
-        except Exception as err:
-            err.extra_info = "Unable to commit go module changes in git"
-            raise err
+        commit(repo, "Updating and vendoring go modules after an upstream merge")
 
     return
 
@@ -351,6 +387,7 @@ def run(
     gh_cloner_key,
     slack_webhook,
     update_go_modules=False,
+    run_make=False,
 ):
     logging.basicConfig(
         format="%(levelname)s - %(message)s", stream=sys.stdout, level=logging.INFO
@@ -414,6 +451,17 @@ def run(
 
         if update_go_modules:
             commit_go_mod_updates(gitwd)
+
+        if run_make:
+            commit_run_make(gitwd)
+
+    except MakeException as ex:
+        # We don't want to fail the merge if make fails, but we should inform
+        # the user that they need to run make merge-bot manually and fix the
+        # issue.
+        logging.warning(ex)
+        pass
+
     except RepoException as ex:
         logging.error(ex)
         message_slack(
