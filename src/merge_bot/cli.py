@@ -168,6 +168,13 @@ def parse_cli_arguments(testing_args=None):
         required=False,
         help="When enabled, the bot will update and vendor the go modules in a separate commit",
     )
+    parser.add_argument(
+        "--run-make",
+        action="store_true",
+        default=False,
+        required=False,
+        help="When enabled, the bot will run `make merge-bot` and submit any change in a separate commit",
+    )
 
     if testing_args is not None:
         args = parser.parse_args(testing_args)

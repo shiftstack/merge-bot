@@ -17,6 +17,7 @@ valid_args = {
     "github-cloner-key": "/credentials/gh-cloner-key",
     "slack-webhook": "/credentials/slack-webhook",
     "update-go-modules": None,
+    "run-make": None,
 }
 
 
@@ -74,6 +75,7 @@ class test_cli(unittest.TestCase):
         self.assertEqual(args.github_cloner_key, "/credentials/gh-cloner-key")
         self.assertEqual(args.slack_webhook, "/credentials/slack-webhook")
         self.assertEqual(args.update_go_modules, True)
+        self.assertEqual(args.run_make, True)
 
     def test_invalid_branch(self):
         for branch in ("dest", "source", "merge"):
