@@ -15,5 +15,9 @@ RUN python -m pip install .
 
 WORKDIR /working
 RUN rm -rf /src
+RUN useradd --no-create-home merge-bot
+RUN chown merge-bot .
+RUN chmod 0777 .
 
+USER merge-bot
 ENTRYPOINT [ "/usr/local/bin/merge-bot" ]
