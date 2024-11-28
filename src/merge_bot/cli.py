@@ -211,6 +211,7 @@ def main():
         gh_cloner_key,
         slack_webhook,
         update_go_modules=args.update_go_modules,
+        run_make=args.run_make,
     )
 
     if success:
