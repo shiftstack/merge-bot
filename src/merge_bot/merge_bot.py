@@ -232,6 +232,10 @@ def push(gitwd, merge):
     if result[0].flags & git.PushInfo.ERROR != 0:
         raise Exception(f"Error pushing to {merge}: {result[0].summary}")
 
+    # Return True if changes were pushed, False if no changes were pushed.
+    # Note: PushInfo.NO_MATCH indicates that nothing changed
+    return not bool(result[0].flags & git.PushInfo.NO_MATCH)
+
 
 def create_pr(g, dest_repo, dest, source, merge):
     logging.info("Checking for existing pull request")
@@ -478,7 +482,7 @@ def run(
         return False
 
     try:
-        push(gitwd, merge)
+        push_result = push(gitwd, merge)
     except Exception as ex:
         logging.exception(ex)
         message_slack(
@@ -500,6 +504,9 @@ def run(
     if created:
         message_slack(slack_webhook, f"I created a new merge PR: <{pr_url}>")
     else:
-        message_slack(slack_webhook, f"I updated existing merge PR: <{pr_url}>")
+        if push_result:
+            message_slack(slack_webhook, f"I updated existing merge PR: <{pr_url}>")
+        else:
+            logging.info(f"No changes pushed to existing PR: <{pr_url}>")
 
     return True
