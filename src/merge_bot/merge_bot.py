@@ -330,7 +330,8 @@ def init_working_dir(
     app_credentials = os.path.join(credentials_dir, "app")
     cloner_credentials = os.path.join(credentials_dir, "cloner")
 
-    os.mkdir(credentials_dir)
+    if not os.path.exists(credentials_dir):
+        os.mkdir(credentials_dir)
     with open(app_credentials, "w") as f:
         f.write(gh_app.session.auth.token)
     with open(cloner_credentials, "w") as f:
