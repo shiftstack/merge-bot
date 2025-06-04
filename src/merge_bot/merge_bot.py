@@ -234,8 +234,8 @@ def push(gitwd, merge):
         raise Exception(f"Error pushing to {merge}: {result[0].summary}")
 
     # Return True if changes were pushed, False if no changes were pushed.
-    # Note: PushInfo.NO_MATCH indicates that nothing changed
-    return not bool(result[0].flags & git.PushInfo.NO_MATCH)
+    # Note: PushInfo.UP_TO_DATE indicates that nothing changed
+    return not bool(result[0].flags & git.PushInfo.UP_TO_DATE)
 
 
 def create_pr(g, dest_repo, dest, source, merge):
