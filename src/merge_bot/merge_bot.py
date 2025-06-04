@@ -139,6 +139,7 @@ def git_merge(gitwd, dest, source, merge):
 
 def message_slack(webhook_url, msg):
     if webhook_url is None:
+        logging.info(msg)
         return
     # Cut long messages to 500 chars
     requests.post(
@@ -233,8 +234,8 @@ def push(gitwd, merge):
         raise Exception(f"Error pushing to {merge}: {result[0].summary}")
 
     # Return True if changes were pushed, False if no changes were pushed.
-    # Note: PushInfo.NO_MATCH indicates that nothing changed
-    return not bool(result[0].flags & git.PushInfo.NO_MATCH)
+    # Note: PushInfo.UP_TO_DATE indicates that nothing changed
+    return not bool(result[0].flags & git.PushInfo.UP_TO_DATE)
 
 
 def create_pr(g, dest_repo, dest, source, merge):
@@ -330,7 +331,8 @@ def init_working_dir(
     app_credentials = os.path.join(credentials_dir, "app")
     cloner_credentials = os.path.join(credentials_dir, "cloner")
 
-    os.mkdir(credentials_dir)
+    if not os.path.exists(credentials_dir):
+        os.mkdir(credentials_dir)
     with open(app_credentials, "w") as f:
         f.write(gh_app.session.auth.token)
     with open(cloner_credentials, "w") as f:
