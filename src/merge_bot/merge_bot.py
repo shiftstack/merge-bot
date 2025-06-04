@@ -139,6 +139,7 @@ def git_merge(gitwd, dest, source, merge):
 
 def message_slack(webhook_url, msg):
     if webhook_url is None:
+        logging.info(msg)
         return
     # Cut long messages to 500 chars
     requests.post(
