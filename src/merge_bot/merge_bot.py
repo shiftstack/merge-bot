@@ -18,6 +18,7 @@ import logging
 import os
 import subprocess
 import sys
+import urllib.parse
 
 import git
 import github3
@@ -470,16 +471,33 @@ def run(
 
     except RepoException as ex:
         logging.error(ex)
+        try:
+            source = urllib.parse.urlparse(source).path.lstrip("/")
+        except Exception:
+            pass
+        # We assume there are no errant code fences here. If there are,
+        # formatting will be broken.
         message_slack(
             slack_webhook,
-            f"Manual intervention is needed to merge {source} into {dest}: {ex}",
+            f"Manual intervention is needed to merge {source} into {dest}:\n"
+            f"```"
+            f"{ex}"
+            f"```",
         )
         return True
     except Exception as ex:
         logging.exception(ex)
+        try:
+            source = urllib.parse.urlparse(source).path.lstrip("/")
+        except Exception:
+            pass
+        # As above
         message_slack(
             slack_webhook,
-            f"I got an error trying to merge {source} into {dest}: {ex}",
+            f"I got an error trying to merge {source} into {dest}:\n"
+            f"```"
+            f"{ex}"
+            f"```",
         )
         return False
 
