@@ -142,15 +142,42 @@ def message_slack(webhook_url, msg):
     if webhook_url is None:
         logging.info(msg)
         return
-    # Cut long messages to 500 chars
+
     requests.post(
         webhook_url,
         json={
             "blocks": [
                 {
                     "type": "section",
-                    "text": {"type": "mrkdwn", "text": msg[:500]},
+                    "text": {"type": "mrkdwn", "text": msg},
                 }
+            ]
+        },
+    )
+
+
+def error_slack(webhook_url, msg, err):
+    if webhook_url is None:
+        logging.info(msg)
+        return
+
+    requests.post(
+        webhook_url,
+        json={
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": msg},
+                },
+                {
+                    "type": "divider",
+                },
+                # We assume there are no errant code fences here. If there are,
+                # formatting will be broken.
+                {
+                    "type": "section",
+                    "text": {"type": "mrkdwn", "text": f"```{err}```"},
+                },
             ]
         },
     )
@@ -163,7 +190,7 @@ def grab_go_version_from_go_mod():
             match = re.search(r"go\s+(\d+.\d+)", txt)
             if match:
                 return match.group(1)
-    except:
+    except Exception:
         logging.info("Failed to discover go version from go.mod")
     return ""
 
@@ -402,8 +429,6 @@ def run(
 
     # App credentials for accessing the destination and opening a PR
     gh_app = github_app_login(gh_app_id, gh_app_key)
-
-    gh_app_name = gh_app.authenticated_app().name
     gh_app = github_login_for_repo(gh_app, dest.ns, dest.name, gh_app_id, gh_app_key)
 
     # App credentials for writing to the merge repo
@@ -419,8 +444,10 @@ def run(
         logging.info(f"Merge repository is {merge_repo.clone_url}")
     except Exception as ex:
         logging.exception(ex)
-        message_slack(
-            slack_webhook, f"I got an error fetching repo information from GitHub: {ex}"
+        error_slack(
+            slack_webhook,
+            "An error occurred fetching repo information from GitHub",
+            ex,
         )
         return False
 
@@ -447,8 +474,10 @@ def run(
         )
     except Exception as ex:
         logging.exception(ex)
-        message_slack(
-            slack_webhook, f"I got an error initialising the git directory: {ex}"
+        error_slack(
+            slack_webhook,
+            "An error occurred initialising the git directory",
+            ex,
         )
         return False
 
@@ -461,28 +490,22 @@ def run(
 
         if run_make:
             commit_run_make(gitwd)
-
     except MakeException as ex:
         # We don't want to fail the merge if make fails, but we should inform
         # the user that they need to run make merge-bot manually and fix the
         # issue.
         logging.warning(ex)
         pass
-
     except RepoException as ex:
         logging.error(ex)
         try:
             source = urllib.parse.urlparse(source).path.lstrip("/")
         except Exception:
             pass
-        # We assume there are no errant code fences here. If there are,
-        # formatting will be broken.
-        message_slack(
+        error_slack(
             slack_webhook,
-            f"Manual intervention is needed to merge {source} into {dest}:\n"
-            f"```"
-            f"{ex}"
-            f"```",
+            f"Manual intervention is needed to merge {source} into {dest}",
+            ex,
         )
         return True
     except Exception as ex:
@@ -491,13 +514,10 @@ def run(
             source = urllib.parse.urlparse(source).path.lstrip("/")
         except Exception:
             pass
-        # As above
-        message_slack(
+        error_slack(
             slack_webhook,
-            f"I got an error trying to merge {source} into {dest}:\n"
-            f"```"
-            f"{ex}"
-            f"```",
+            f"An error occurred trying to merge {source} into {dest}",
+            ex,
         )
         return False
 
@@ -505,9 +525,10 @@ def run(
         push_result = push(gitwd, merge)
     except Exception as ex:
         logging.exception(ex)
-        message_slack(
+        error_slack(
             slack_webhook,
-            f"I got an error pushing to {merge}: {ex}",
+            f"An error occurred pushing to {merge}",
+            ex,
         )
         return False
 
@@ -516,16 +537,16 @@ def run(
         logging.info(f"Merge PR is {pr_url}")
     except Exception as ex:
         logging.exception(ex)
-
-        message_slack(slack_webhook, f"I got an error creating a merge PR: {ex}")
-
+        error_slack(slack_webhook, "An error occurred creating a merge PR", ex)
         return False
 
     if created:
-        message_slack(slack_webhook, f"I created a new merge PR: <{pr_url}>")
+        message_slack(slack_webhook, f"A new merge PR was created: <{pr_url}>")
     else:
         if push_result:
-            message_slack(slack_webhook, f"I updated existing merge PR: <{pr_url}>")
+            message_slack(
+                slack_webhook, f"An existing merge PR was updated: <{pr_url}>"
+            )
         else:
             logging.info(f"No changes pushed to existing PR: <{pr_url}>")
 

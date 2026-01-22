@@ -16,7 +16,6 @@
 
 import argparse
 import re
-import sys
 import validators
 
 from . import merge_bot
